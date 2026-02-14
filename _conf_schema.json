@@ -1,0 +1,137 @@
+{
+  "base_url": {
+    "type": "string",
+    "description": "Linux.do 站点地址",
+    "default": "https://linux.do"
+  },
+  "cookie": {
+    "type": "text",
+    "description": "Linux.do 请求头里的 Cookie（登录后从浏览器开发者工具复制）",
+    "default": ""
+  },
+  "user_agent": {
+    "type": "text",
+    "description": "Linux.do 请求头里的 User-Agent（登录后从浏览器开发者工具复制）",
+    "default": ""
+  },
+  "proxy_url": {
+    "type": "string",
+    "description": "HTTP 代理地址（为空则不强制指定；示例：http://127.0.0.1:10808）",
+    "default": ""
+  },
+  "proxy_use_env": {
+    "type": "bool",
+    "description": "是否使用环境变量代理（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY）。当 proxy_url 不为空时自动忽略环境变量。",
+    "default": true
+  },
+  "request_timeout_seconds": {
+    "type": "int",
+    "description": "HTTP 请求超时秒数",
+    "default": 20
+  },
+  "curl_impersonate": {
+    "type": "string",
+    "description": "curl_cffi 使用的浏览器指纹（例如 chrome124）",
+    "default": "chrome124"
+  },
+  "request_retry_on_429": {
+    "type": "bool",
+    "description": "遇到 HTTP 429 是否自动重试",
+    "default": true
+  },
+  "request_max_retries": {
+    "type": "int",
+    "description": "429 自动重试次数（不含首次请求）",
+    "default": 1
+  },
+  "request_retry_backoff_seconds": {
+    "type": "int",
+    "description": "429 重试退避基数秒数（指数退避）",
+    "default": 2
+  },
+  "trend_period": {
+    "type": "string",
+    "description": "热门帖子周期（daily / weekly / monthly / yearly / all）",
+    "default": "daily"
+  },
+  "trend_return_count": {
+    "type": "int",
+    "description": "/ldo_trend 返回帖子个数",
+    "default": 10
+  },
+  "comment_return_count": {
+    "type": "int",
+    "description": "/ldo_comment 未传 num 时默认返回评论条数",
+    "default": 3
+  },
+  "post_excerpt_length": {
+    "type": "int",
+    "description": "/ldo 一楼正文最大返回字符数",
+    "default": 1200
+  },
+  "post_image_max_count": {
+    "type": "int",
+    "description": "/ldo 一楼最多发送图片数量（0 表示不发送图片）",
+    "default": 6
+  },
+  "post_image_max_bytes_kb": {
+    "type": "int",
+    "description": "/ldo 单张图片最大体积（KB，超过将跳过）",
+    "default": 4096
+  },
+  "comment_excerpt_length": {
+    "type": "int",
+    "description": "/ldo_comment 每条评论最大返回字符数",
+    "default": 260
+  },
+  "ldo_update_interval_seconds": {
+    "type": "int",
+    "description": "订阅检查间隔（秒）",
+    "default": 300
+  },
+  "subscription_scan_count": {
+    "type": "int",
+    "description": "每次检查订阅时扫描的最新帖子数量",
+    "default": 40
+  },
+  "subscription_scan_pages": {
+    "type": "int",
+    "description": "每次检查订阅时最多翻页抓取页数（优先 latest.json?page=n）",
+    "default": 3
+  },
+  "enable_subscription_push": {
+    "type": "bool",
+    "description": "是否启用 /ldo_sub 的后台推送",
+    "default": true
+  },
+  "match_title_for_sub": {
+    "type": "bool",
+    "description": "订阅匹配时是否额外匹配标题关键字",
+    "default": true
+  },
+  "subscription_match_title_only": {
+    "type": "bool",
+    "description": "订阅匹配是否仅匹配标题（开启后不再匹配 Linux.do 主题 tags）",
+    "default": false
+  },
+  "subscription_enable_regex": {
+    "type": "bool",
+    "description": "订阅关键词是否启用正则匹配（使用 `re:你的正则`）",
+    "default": true
+  },
+  "subscription_regex_prefix": {
+    "type": "string",
+    "description": "订阅正则前缀（例如 re:），仅当前缀命中时按正则解析",
+    "default": "re:"
+  },
+  "subscription_regex_ignore_case": {
+    "type": "bool",
+    "description": "订阅正则是否忽略大小写",
+    "default": true
+  },
+  "subscription_regex_max_length": {
+    "type": "int",
+    "description": "订阅正则最大长度（用于降低复杂正则风险）",
+    "default": 120
+  }
+}

@@ -8,7 +8,7 @@ from typing import Any
 
 try:
     from curl_cffi import requests as curl_requests
-except Exception:
+except ImportError:
     curl_requests = None
 
 
@@ -42,6 +42,7 @@ class LinuxDoClient:
         request_retry_backoff_seconds: float = 1.2,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self._base_host = (urllib.parse.urlparse(self.base_url).netloc or "").lower()
         self.cookie = self._clean_header_value(cookie)
         self.user_agent = self._clean_header_value(user_agent) or DEFAULT_USER_AGENT
         self.timeout_seconds = max(5, int(timeout_seconds))
@@ -50,13 +51,17 @@ class LinuxDoClient:
         self.curl_impersonate = (curl_impersonate or "chrome124").strip()
         self.request_retry_on_429 = bool(request_retry_on_429)
         self.request_max_retries = max(0, int(request_max_retries))
-        self.request_retry_backoff_seconds = max(0.1, float(request_retry_backoff_seconds))
+        self.request_retry_backoff_seconds = max(
+            0.1, float(request_retry_backoff_seconds)
+        )
 
     @staticmethod
     def _clean_header_value(value: str | None) -> str:
         if not value:
             return ""
-        return " ".join(str(value).replace("\r", " ").replace("\n", " ").split()).strip()
+        return " ".join(
+            str(value).replace("\r", " ").replace("\n", " ").split()
+        ).strip()
 
     def is_configured(self) -> bool:
         return bool(self.cookie and self.user_agent)
@@ -158,7 +163,15 @@ class LinuxDoClient:
         if not url:
             raise LinuxDoApiError("空的图片 URL")
 
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.scheme not in {"http", "https"}:
+            raise LinuxDoApiError(
+                f"Unsupported URL scheme: {parsed_url.scheme or 'unknown'}"
+            )
+
         headers = self._build_headers(method="GET")
+        if self._base_host and (parsed_url.netloc or "").lower() != self._base_host:
+            headers.pop("Cookie", None)
         headers["Accept"] = "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
         headers["Sec-Fetch-Dest"] = "image"
 
@@ -167,10 +180,15 @@ class LinuxDoClient:
 
         for attempt in range(attempts):
             try:
-                with curl_requests.Session(impersonate=self.curl_impersonate) as session:
+                with curl_requests.Session(
+                    impersonate=self.curl_impersonate
+                ) as session:
                     session.trust_env = (not self.proxy_url) and self.proxy_use_env
                     if self.proxy_url:
-                        session.proxies = {"http": self.proxy_url, "https": self.proxy_url}
+                        session.proxies = {
+                            "http": self.proxy_url,
+                            "https": self.proxy_url,
+                        }
 
                     response = session.request(
                         method="GET",
@@ -226,10 +244,15 @@ class LinuxDoClient:
 
         for attempt in range(attempts):
             try:
-                with curl_requests.Session(impersonate=self.curl_impersonate) as session:
+                with curl_requests.Session(
+                    impersonate=self.curl_impersonate
+                ) as session:
                     session.trust_env = (not self.proxy_url) and self.proxy_use_env
                     if self.proxy_url:
-                        session.proxies = {"http": self.proxy_url, "https": self.proxy_url}
+                        session.proxies = {
+                            "http": self.proxy_url,
+                            "https": self.proxy_url,
+                        }
 
                     response = session.request(
                         method=method.upper(),
@@ -244,7 +267,11 @@ class LinuxDoClient:
                 status_code = int(getattr(response, "status_code", 0))
                 text = str(getattr(response, "text", "") or "")
                 if status_code < 200 or status_code >= 300:
-                    self._raise_for_status(status_code, text, headers=getattr(response, "headers", {}) or {})
+                    self._raise_for_status(
+                        status_code,
+                        text,
+                        headers=getattr(response, "headers", {}) or {},
+                    )
 
                 return self._parse_json_text(text)
             except LinuxDoApiError as exc:
@@ -293,7 +320,9 @@ class LinuxDoClient:
             raise LinuxDoApiError(hint)
         if status_code in (401, 403):
             raise LinuxDoAuthError("登录状态无效或已过期，请更新 Cookie/User-Agent")
-        raise LinuxDoApiError(f"Linux.do API 请求失败: HTTP {status_code} {body_preview}")
+        raise LinuxDoApiError(
+            f"Linux.do API 请求失败: HTTP {status_code} {body_preview}"
+        )
 
     def _build_headers(self, method: str) -> dict[str, str]:
         is_write = method.upper() in {"POST", "PUT", "DELETE", "PATCH"}

@@ -12,27 +12,35 @@ from typing import Any
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
-from astrbot.api.star import Context, Star, StarTools, register
+from astrbot.api.star import Context, Star, StarTools
 
 try:
-    from .linuxdo_client import LinuxDoApiError, LinuxDoAuthError, LinuxDoClient
+    from .linuxdo_client import LinuxDoApiError, LinuxDoClient
 except ImportError:
-    from linuxdo_client import LinuxDoApiError, LinuxDoAuthError, LinuxDoClient
+    from linuxdo_client import LinuxDoApiError, LinuxDoClient
 
 
 PLUGIN_ID = "astrbot_plugin_linuxdo"
 TOPIC_URL_PATTERN = re.compile(r"/t/(?:[^/]+/)?(\d+)")
 HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 IMG_TAG_PATTERN = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
-IMG_ATTR_ORIG_PATTERN = re.compile(r"\bdata-orig-src\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
-IMG_ATTR_DATA_PATTERN = re.compile(r"\bdata-src\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
+IMG_ATTR_ORIG_PATTERN = re.compile(
+    r"\bdata-orig-src\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
+IMG_ATTR_DATA_PATTERN = re.compile(
+    r"\bdata-src\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
 IMG_ATTR_SRC_PATTERN = re.compile(r"\bsrc\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 LIGHTBOX_FIGURE_PATTERN = re.compile(
     r"<figure\b[^>]*class=[\"'][^\"']*lightbox[^\"']*[\"'][^>]*>.*?</figure>",
     re.IGNORECASE | re.DOTALL,
 )
-FIGCAPTION_PATTERN = re.compile(r"<figcaption\b[^>]*>.*?</figcaption>", re.IGNORECASE | re.DOTALL)
-MEDIA_TOKEN_PATTERN = re.compile(r"<a\b[^>]*>.*?</a>|<img\b[^>]*>", re.IGNORECASE | re.DOTALL)
+FIGCAPTION_PATTERN = re.compile(
+    r"<figcaption\b[^>]*>.*?</figcaption>", re.IGNORECASE | re.DOTALL
+)
+MEDIA_TOKEN_PATTERN = re.compile(
+    r"<a\b[^>]*>.*?</a>|<img\b[^>]*>", re.IGNORECASE | re.DOTALL
+)
 A_HREF_PATTERN = re.compile(r"\bhref\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 A_CLASS_PATTERN = re.compile(r"\bclass\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 ANCHOR_INNER_PATTERN = re.compile(r"^<a\b[^>]*>(.*)</a>$", re.IGNORECASE | re.DOTALL)
@@ -82,13 +90,6 @@ class GroupSubscription:
         )
 
 
-@register(
-    "astrbot_plugin_linuxdo",
-    "vmoranv",
-    "Linux.do 帖子查询与群聊订阅推送",
-    "1.1.6",
-    "https://github.com/vmoranv/astrbot_plugin_linuxdo",
-)
 class LinuxDoPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context, config)
@@ -134,7 +135,9 @@ class LinuxDoPlugin(Star):
 
         try:
             topic = await client.get_topic(topic_id)
-            posts = await self._collect_topic_posts(topic_id, topic, required_count=1, client=client)
+            posts = await self._collect_topic_posts(
+                topic_id, topic, required_count=1, client=client
+            )
         except LinuxDoApiError as exc:
             yield event.plain_result(f"获取帖子失败：{exc}")
             return
@@ -156,7 +159,9 @@ class LinuxDoPlugin(Star):
         max_images = self._conf_int("post_image_max_count", 6, 0, 20)
         max_bytes = self._conf_int("post_image_max_bytes_kb", 4096, 128, 20480) * 1024
         text_limit = self._conf_int("post_excerpt_length", 1200, 200, 5000)
-        content_parts = self._extract_post_content_parts(first_post, text_limit, max_images)
+        content_parts = self._extract_post_content_parts(
+            first_post, text_limit, max_images
+        )
         if not content_parts:
             content_parts = [("text", "(无正文)")]
 
@@ -259,7 +264,9 @@ class LinuxDoPlugin(Star):
         current_result = check_map.get("u/current.json", "")
         categories_ok = check_map.get("categories.json", "").startswith("OK")
         top_ok = check_map.get("top.json?period=daily", "").startswith("OK")
-        current_limited = ("HTTP 429" in current_result) or ("触发限流" in current_result)
+        current_limited = ("HTTP 429" in current_result) or (
+            "触发限流" in current_result
+        )
 
         lines = ["Linux.do 鉴权诊断："]
         lines.append("- request_backend: curl_cffi (fixed)")
@@ -269,20 +276,26 @@ class LinuxDoPlugin(Star):
         for name, result in checks:
             lines.append(f"- {name}: {result}")
         if current_limited and categories_ok and top_ok:
-            lines.append("- conclusion: u/current.json 被限流，但读取接口可用（可继续使用 /ldo 与 /ldo_trend）。")
+            lines.append(
+                "- conclusion: u/current.json 被限流，但读取接口可用（可继续使用 /ldo 与 /ldo_trend）。"
+            )
         elif categories_ok and top_ok:
             lines.append("- conclusion: 核心读取接口可用。")
         yield event.plain_result("\n".join(lines))
 
     @filter.command("ldo_comment")
-    async def ldo_comment(self, event: AstrMessageEvent, topic_input: str, num: int = 0):
+    async def ldo_comment(
+        self, event: AstrMessageEvent, topic_input: str, num: int = 0
+    ):
         """/ldo_comment <url|帖子id> <num> 返回帖子评论"""
         topic_id = self._parse_topic_id(topic_input)
         if topic_id <= 0:
             yield event.plain_result("参数错误：请输入有效的帖子 URL 或帖子 ID。")
             return
 
-        target_count = num if num > 0 else self._conf_int("comment_return_count", 3, 1, 20)
+        target_count = (
+            num if num > 0 else self._conf_int("comment_return_count", 3, 1, 20)
+        )
         target_count = max(1, min(target_count, 20))
 
         client = self._build_client()
@@ -311,7 +324,11 @@ class LinuxDoPlugin(Star):
 
         comment_excerpt_length = self._conf_int("comment_excerpt_length", 260, 80, 2000)
         selected = comments[:target_count]
-        lines = [f"【{title}】前 {len(selected)} 条评论：", f"链接：{self._topic_url(topic_id)}", ""]
+        lines = [
+            f"【{title}】前 {len(selected)} 条评论：",
+            f"链接：{self._topic_url(topic_id)}",
+            "",
+        ]
         for post in selected:
             floor = int(post.get("post_number", 0))
             user = str(post.get("username") or "unknown")
@@ -388,9 +405,7 @@ class LinuxDoPlugin(Star):
                         response_text = "已移除该 tag，当前群已无订阅。"
                     else:
                         self._save_state_locked()
-                        response_text = (
-                            f"已取消 `{normalized_tag}`。\n剩余订阅：{', '.join(sorted(sub.tags))}"
-                        )
+                        response_text = f"已取消 `{normalized_tag}`。\n剩余订阅：{', '.join(sorted(sub.tags))}"
             else:
                 del self._subscriptions[session]
                 self._save_state_locked()
@@ -443,7 +458,9 @@ class LinuxDoPlugin(Star):
             if not self._subscriptions:
                 return
             snapshot = {k: v.snapshot() for k, v in self._subscriptions.items()}
-            min_last_seen = min((sub.last_seen_topic_id for sub in snapshot.values()), default=0)
+            min_last_seen = min(
+                (sub.last_seen_topic_id for sub in snapshot.values()), default=0
+            )
 
         client = self._build_client()
         if not client.is_configured():
@@ -534,7 +551,9 @@ class LinuxDoPlugin(Star):
             # Only advance last_seen if we paged far enough back (otherwise we may miss older topics).
             can_advance = (min_topic_id <= last_seen) if last_seen > 0 else True
             updates[session] = {
-                "last_seen_topic_id": (max(last_seen, max_topic_id) if can_advance else last_seen),
+                "last_seen_topic_id": (
+                    max(last_seen, max_topic_id) if can_advance else last_seen
+                ),
                 "can_advance": can_advance,
                 "pushed_topic_ids": pushed_topic_ids,
             }
@@ -555,7 +574,9 @@ class LinuxDoPlugin(Star):
                     before = len(sub.announced_topic_ids)
                     sub.announced_topic_ids.update(pushed_ids)
                     if len(sub.announced_topic_ids) > 500:
-                        sub.announced_topic_ids = set(sorted(sub.announced_topic_ids)[-500:])
+                        sub.announced_topic_ids = set(
+                            sorted(sub.announced_topic_ids)[-500:]
+                        )
                     changed = changed or len(sub.announced_topic_ids) != before
 
             if changed:
@@ -638,7 +659,9 @@ class LinuxDoPlugin(Star):
         needle = tag.lower()
         if title_only:
             return bool(match_title and needle in title_lower)
-        if needle in topic_tags_lower or any(needle in one_tag for one_tag in topic_tags_lower):
+        if needle in topic_tags_lower or any(
+            needle in one_tag for one_tag in topic_tags_lower
+        ):
             return True
         return bool(match_title and needle in title_lower)
 
@@ -657,7 +680,7 @@ class LinuxDoPlugin(Star):
         if not raw.lower().startswith(prefix.lower()):
             return False, None
 
-        pattern_text = raw[len(prefix):].strip()
+        pattern_text = raw[len(prefix) :].strip()
         if not pattern_text:
             return True, None
 
@@ -669,7 +692,11 @@ class LinuxDoPlugin(Star):
             )
             return True, None
 
-        flags = re.IGNORECASE if self._conf_bool("subscription_regex_ignore_case", True) else 0
+        flags = (
+            re.IGNORECASE
+            if self._conf_bool("subscription_regex_ignore_case", True)
+            else 0
+        )
         try:
             return True, re.compile(pattern_text, flags)
         except re.error as exc:
@@ -700,7 +727,9 @@ class LinuxDoPlugin(Star):
         missing = [pid for pid in stream_ids if pid not in exists]
         if missing:
             remain = max(0, required_count - len(posts))
-            extra_posts = await client.get_topic_posts_by_ids(topic_id=topic_id, post_ids=missing[:remain])
+            extra_posts = await client.get_topic_posts_by_ids(
+                topic_id=topic_id, post_ids=missing[:remain]
+            )
             posts.extend(extra_posts)
 
         unique: dict[int, dict[str, Any]] = {}
@@ -734,18 +763,24 @@ class LinuxDoPlugin(Star):
             return await client.get_latest_topics(page=page), "latest"
         except LinuxDoApiError as exc_latest:
             if page > 0:
-                logger.warning(f"[linuxdo] latest.json 第 {page} 页抓取失败: {exc_latest}")
+                logger.warning(
+                    f"[linuxdo] latest.json 第 {page} 页抓取失败: {exc_latest}"
+                )
                 return [], "latest"
 
             try:
-                logger.warning(f"[linuxdo] latest.json 抓取失败，回退 top.json: {exc_latest}")
+                logger.warning(
+                    f"[linuxdo] latest.json 抓取失败，回退 top.json: {exc_latest}"
+                )
                 return await client.get_top_topics(period=trend_period), "top"
             except LinuxDoApiError as exc_top:
                 logger.warning(f"[linuxdo] top.json 抓取失败，回退 new.json: {exc_top}")
                 try:
                     return await client.get_new_topics(page=0), "new"
                 except LinuxDoApiError as exc_new:
-                    logger.warning(f"[linuxdo] new.json 也抓取失败，订阅扫描跳过: {exc_new}")
+                    logger.warning(
+                        f"[linuxdo] new.json 也抓取失败，订阅扫描跳过: {exc_new}"
+                    )
                     return [], "new"
 
     async def _get_latest_topic_id(self, client: LinuxDoClient) -> int:
@@ -756,7 +791,9 @@ class LinuxDoPlugin(Star):
                 if source == "latest":
                     topics = await client.get_latest_topics(page=0)
                 elif source == "top":
-                    topics = await client.get_top_topics(period=self._conf_str("trend_period", "daily"))
+                    topics = await client.get_top_topics(
+                        period=self._conf_str("trend_period", "daily")
+                    )
                 else:
                     topics = await client.get_new_topics(page=0)
                 if topics:
@@ -788,10 +825,13 @@ class LinuxDoPlugin(Star):
 
     def _resolve_state_file(self) -> Path:
         try:
-            data_dir = StarTools.get_data_dir(PLUGIN_ID)
-        except Exception:
-            data_dir = Path(__file__).resolve().parent / "data"
-            data_dir.mkdir(parents=True, exist_ok=True)
+            data_dir = Path(StarTools.get_data_dir(PLUGIN_ID))
+        except Exception as exc:
+            logger.warning(
+                f"[linuxdo] StarTools.get_data_dir unavailable, fallback to standard plugin data dir: {exc}"
+            )
+            data_dir = Path("data") / "plugin_data" / PLUGIN_ID
+        data_dir.mkdir(parents=True, exist_ok=True)
         return data_dir / "subscriptions.json"
 
     def _load_state(self):
@@ -854,7 +894,7 @@ class LinuxDoPlugin(Star):
         if not prefix:
             prefix = "re:"
         if raw.lower().startswith(prefix.lower()):
-            pattern = raw[len(prefix):].strip()
+            pattern = raw[len(prefix) :].strip()
             if not pattern:
                 return ""
             return f"{prefix}{pattern}"
@@ -914,7 +954,7 @@ class LinuxDoPlugin(Star):
         pos = 0
         for match in MEDIA_TOKEN_PATTERN.finditer(cooked):
             if match.start() > pos:
-                tokens.append(("html", cooked[pos:match.start()]))
+                tokens.append(("html", cooked[pos : match.start()]))
             token_html = match.group(0)
             extracted = self._extract_media_url_from_token(token_html)
             if extracted:
@@ -962,7 +1002,11 @@ class LinuxDoPlugin(Star):
         return merged
 
     def _extract_image_url_from_img_tag(self, tag_text: str) -> str:
-        for pattern in (IMG_ATTR_ORIG_PATTERN, IMG_ATTR_DATA_PATTERN, IMG_ATTR_SRC_PATTERN):
+        for pattern in (
+            IMG_ATTR_ORIG_PATTERN,
+            IMG_ATTR_DATA_PATTERN,
+            IMG_ATTR_SRC_PATTERN,
+        ):
             m = pattern.search(tag_text)
             if m:
                 return m.group(1).strip()
@@ -989,7 +1033,7 @@ class LinuxDoPlugin(Star):
         class_match = A_CLASS_PATTERN.search(raw)
         class_text = (class_match.group(1) if class_match else "").lower()
         href_match = A_HREF_PATTERN.search(raw)
-        href = (href_match.group(1).strip() if href_match else "")
+        href = href_match.group(1).strip() if href_match else ""
         if not href:
             return ""
 
@@ -998,13 +1042,16 @@ class LinuxDoPlugin(Star):
             return ""
 
         # 1) Explicit image-ish anchor classes.
-        if ("lightbox" in class_text or "attachment" in class_text) and self._should_keep_image_url(normalized):
+        if (
+            "lightbox" in class_text or "attachment" in class_text
+        ) and self._should_keep_image_url(normalized):
             return normalized
 
         # 2) Attachment-like text (e.g. "460×260 26.2 KB") with uploads URL.
         inner_text = self._anchor_inner_text(raw)
         looks_like_image_meta = bool(
-            IMAGE_META_PATTERN.search(inner_text) or IMAGE_SIZE_ONLY_PATTERN.search(inner_text),
+            IMAGE_META_PATTERN.search(inner_text)
+            or IMAGE_SIZE_ONLY_PATTERN.search(inner_text),
         )
         if looks_like_image_meta and "/uploads/" in normalized.lower():
             return normalized
@@ -1059,7 +1106,11 @@ class LinuxDoPlugin(Star):
         for tag_match in IMG_TAG_PATTERN.finditer(cooked):
             tag_text = tag_match.group(0)
             candidate = ""
-            for pattern in (IMG_ATTR_ORIG_PATTERN, IMG_ATTR_DATA_PATTERN, IMG_ATTR_SRC_PATTERN):
+            for pattern in (
+                IMG_ATTR_ORIG_PATTERN,
+                IMG_ATTR_DATA_PATTERN,
+                IMG_ATTR_SRC_PATTERN,
+            ):
                 m = pattern.search(tag_text)
                 if m:
                     candidate = m.group(1).strip()
@@ -1101,9 +1152,20 @@ class LinuxDoPlugin(Star):
         # Avoid avatars/emojis and other UI icons.
         if "user_avatar" in lowered:
             return False
-        if ("/emoji/" in lowered or "/images/emoji/" in lowered) and ("/uploads/" not in lowered):
+        if ("/emoji/" in lowered or "/images/emoji/" in lowered) and (
+            "/uploads/" not in lowered
+        ):
             return False
-        image_suffixes = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp", ".heic")
+        image_suffixes = (
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".avif",
+            ".bmp",
+            ".heic",
+        )
         if lowered.endswith(image_suffixes):
             return True
         if "/uploads/" in lowered:

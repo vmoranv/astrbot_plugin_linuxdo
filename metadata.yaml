@@ -1,6 +1,6 @@
 name: astrbot_plugin_linuxdo
 display_name: LinuxDo 助手
 desc: Linux.do 帖子查询、热门趋势与群聊订阅推送插件。
-version: v1.1.6
+version: v1.1.7
 author: vmoranv
 repo: https://github.com/vmoranv/astrbot_plugin_linuxdo
